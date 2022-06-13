@@ -818,19 +818,20 @@ def ReadComments(input_files, input_format, font_size=25.0, progress_callback=No
         with ConvertToFile(i, 'r', encoding='utf-8', errors='replace') as f:
             s = f.read()
             str_io = io.StringIO(s)
-            if input_format == 'autodetect':
-                CommentProcessor = GetCommentProcessor(str_io)
-                if not CommentProcessor:
-                    raise ValueError(
-                        'Failed to detect comment file format: %s' % i
-                    )
-            else:
-                CommentProcessor = CommentFormatMap.get(input_format)
-                if not CommentProcessor:
-                    raise ValueError(
-                        'Unknown comment file format: %s' % input_format
-                    )
-            comments.extend(CommentProcessor(FilterBadChars(str_io), font_size))
+            comments.extend(ReadCommentsNiconico(FilterBadChars(str_io), font_size))
+            # if input_format == 'autodetect':
+            #     CommentProcessor = GetCommentProcessor(str_io)
+            #     if not CommentProcessor:
+            #         raise ValueError(
+            #             'Failed to detect comment file format: %s' % i
+            #         )
+            # else:
+            #     CommentProcessor = CommentFormatMap.get(input_format)
+            #     if not CommentProcessor:
+            #         raise ValueError(
+            #             'Unknown comment file format: %s' % input_format
+            #         )
+            # comments.extend(CommentProcessor(FilterBadChars(str_io), font_size))
     if progress_callback:
         progress_callback(len(input_files), len(input_files))
     comments.sort()
