@@ -133,8 +133,6 @@ def ReadCommentsNiconico(f, fontsize):
             pos = 0
             color = 0xffffff
             size = fontsize
-            color_important = 0
-            is_aa = False
             for mailstyle in str(comment.getAttribute('mail')).split():
                 if mailstyle == 'ue':
                     pos = 1
@@ -144,28 +142,9 @@ def ReadCommentsNiconico(f, fontsize):
                     size = fontsize * 1.44
                 elif mailstyle == 'small':
                     size = fontsize * 0.64
-                elif m := re.match(r'#([\dA-Fa-f]{6})', mailstyle):
-                    color_important = int(m[1], base=16)
                 elif mailstyle in NiconicoColorMap:
                     color = NiconicoColorMap[mailstyle]
-                elif mailstyle == 'gothic':
-                    is_aa = True
-            if color_important:
-                color = color_important
-            if is_aa:
-                size = 10
-            yield dict(
-                timeline=max(int(comment.getAttribute('vpos')), 0) * 0.01,
-                timestamp=int(comment.getAttribute('date')),
-                no=int(comment.getAttribute('no')),
-                comment=c,
-                pos=pos,
-                color=color,
-                size=size,
-                height=(c.count('\n') + 1) * size,
-                width=CalculateLength(c) * size,
-                is_aa=is_aa
-            )
+            yield (max(int(comment.getAttribute('vpos')), 0) * 0.01, int(comment.getAttribute('date')), int(comment.getAttribute('no')), c, pos, color, size, (c.count('\n') + 1) * size, CalculateLength(c) * size)
         except (AssertionError, AttributeError, IndexError, TypeError, ValueError):
             logging.warning('Invalid comment: %s' % comment.toxml())
             continue
@@ -560,7 +539,7 @@ def ConvertFlashRotation(rotY, rotZ, X, Y, width, height):
 
 
 def ProcessComments(comments, f, width, height, bottomReserved, fontface, fontsize, alpha, duration_marquee, duration_still, filters_regex, reduced, progress_callback):
-    styleid = 'Danmaku2ASS_%04x' % random.randint(0, 0xffff)
+    styleid = 'white'
     WriteASSHead(f, width, height, fontface, fontsize, alpha, styleid)
     rows = [[None] * (height - bottomReserved + 1) for i in range(4)]
     for idx, i in enumerate(comments):
@@ -661,7 +640,7 @@ YCbCr Matrix: TV.709
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: %(styleid)s, %(fontface)s, %(fontsize).0f, &H%(alpha)02XFFFFFF, &H%(alpha)02XFFFFFF, &H%(alpha)02X000000, &H%(alpha)02X000000, -1, 0, 0, 0, 150, 150, 0.00, 0.00, 1, %(outline).0f, 0, 7, 20, 20, 40, 1
+Style: %(styleid)s, %(fontface)s, %(fontsize).0f, &H%(alpha)02XFFFFFF, &H%(alpha)02XFFFFFF, &H%(alpha)02X000000, &H%(alpha)02X000000, -1, 0, 0, 0, 100, 100, 0.00, 0.00, 1, 0.5, 0, 7, 20, 20, 60, 1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -670,29 +649,27 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 def WriteComment(f, c, row, width, height, bottomReserved, fontsize, duration_marquee, duration_still, styleid):
-    text = ASSEscape(c['comment'])
+    text = ASSEscape(c[3])
     styles = []
-    if c['pos'] == 1:
+    if c[4] == 1:
         styles.append('\\an8\\pos(%(halfwidth)d, %(row)d)' % {'halfwidth': width / 2, 'row': row})
         duration = duration_still
-    elif c['pos'] == 2:
+    elif c[4] == 2:
         styles.append('\\an2\\pos(%(halfwidth)d, %(row)d)' % {'halfwidth': width / 2, 'row': ConvertType2(row, height, bottomReserved)})
         duration = duration_still
-    elif c['pos'] == 3:
-        styles.append('\\move(%(neglen)d, %(row)d, %(width)d, %(row)d)' % {'width': width, 'row': row, 'neglen': -math.ceil(c['width'])})
+    elif c[4] == 3:
+        styles.append('\\move(%(neglen)d, %(row)d, %(width)d, %(row)d)' % {'width': width, 'row': row, 'neglen': -math.ceil(c[8])})
         duration = duration_marquee
     else:
-        styles.append('\\move(%(width)d, %(row)d, %(neglen)d, %(row)d)' % {'width': width, 'row': row, 'neglen': -math.ceil(c['width'])})
+        styles.append('\\move(%(width)d, %(row)d, %(neglen)d, %(row)d)' % {'width': width, 'row': row, 'neglen': -math.ceil(c[8])})
         duration = duration_marquee
-    if styleid == 'aa':
-        styles.append('\\fsp-1')
-    elif not(-1 < c['size'] - fontsize < 1):
-        styles.append('\\fs%.0f' % c['size'])
-    if c['color'] != 0xffffff:
-        styles.append('\\c&H%s&' % ConvertColor(c['color']))
-        if c['color'] == 0x000000:
+    if not (-1 < c[6] - fontsize < 1):
+        styles.append('\\fs%.0f' % c[6])
+    if c[5] != 0xffffff:
+        styles.append('\\c&H%s&' % ConvertColor(c[5]))
+        if c[5] == 0x000000:
             styles.append('\\3c&HFFFFFF&')
-    f.write('Dialogue: 2,%(start)s,%(end)s,%(styleid)s,,0000,0000,0000,,{%(styles)s}%(text)s\n' % {'start': ConvertTimestamp(c['timeline']), 'end': ConvertTimestamp(c['timeline'] + duration), 'styles': ''.join(styles), 'text': text, 'styleid': styleid})
+    f.write('Dialogue: 0,%(start)s,%(end)s,%(styleid)s,,0000,0000,0000,,{%(styles)s}%(text)s\n' % {'start': ConvertTimestamp(c[0]), 'end': ConvertTimestamp(c[0] + duration), 'styles': ''.join(styles), 'text': text, 'styleid': styleid})
 
 
 def ASSEscape(s):
@@ -848,7 +825,7 @@ def main():
     if len(sys.argv) == 1:
         sys.argv.append('--help')
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--format', metavar='FORMAT', help='Format of input file (autodetect|%s) [default: autodetect]' % '|'.join(i for i in CommentFormatMap), default='autodetect')
+    parser.add_argument('-f', '--format', metavar='FORMAT', help='Format of input file (autodetect|%s) [default: autodetect]' % '|'.join(i for i in CommentFormatMap), default='Niconico')
     parser.add_argument('-o', '--output', metavar='OUTPUT', help='Output file')
     parser.add_argument('-s', '--size', metavar='WIDTHxHEIGHT', required=True, help='Stage size in pixels')
     parser.add_argument('-fn', '--font', metavar='FONT', help='Specify font face [default: %s]' % '(FONT) sans-serif'[7:], default='(FONT) sans-serif'[7:])
