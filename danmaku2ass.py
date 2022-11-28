@@ -326,24 +326,12 @@ def ReadCommentsTudou2(f, fontsize):
 
 
 def ReadCommentsMioMio(f, fontsize):
-    niconico_color_map = {
-        'red': 0xff0000,
-        'pink': 0xff8080,
-        'orange': 0xffc000,
-        'yellow': 0xffff00,
-        'green': 0x00ff00,
-        'cyan': 0x00ffff,
-        'blue': 0x0000ff,
-        'purple': 0xc000ff,
-        'black': 0x000000
-    }
     dom = xml.dom.minidom.parse(f)
     comment_element = dom.getElementsByTagName('data')
     for i, comment in enumerate(comment_element):
         try:
             message = comment.getElementsByTagName('message')[0]
             c = str(message.childNodes[0].wholeText)
-            pos = 0
             size = int(message.getAttribute('fontsize')) * fontsize / 25.0
             yield (float(
                 comment.getElementsByTagName('playTime')
@@ -473,7 +461,7 @@ def WriteCommentBilibiliPositioned(f, c, width, height, styleid):
                 'text': text,
                 'styleid': styleid
             })
-    except (IndexError, ValueError) as e:
+    except (IndexError, ValueError):
         try:
             logging.warning('Invalid comment: %r' % c[3])
         except IndexError:
@@ -590,10 +578,8 @@ def WriteCommentAcfunPositioned(f, c, width, height, styleid):
         action_styles = transform_styles
         for action in actions:
             action = dict(action)
-            from_x, from_y = to_x, to_y
             from_out_x, from_out_y = to_out_x, to_out_y
             from_scale_x, from_scale_y = to_scale_x, to_scale_y
-            from_rotate_z, from_rotate_y = to_rotate_z, to_rotate_y
             from_color, from_alpha = to_color, to_alpha
             transform_styles, action_styles = action_styles, []
             from_time += action_time
@@ -628,7 +614,7 @@ def WriteCommentAcfunPositioned(f, c, width, height, styleid):
                 styles.append('\\t(%s)' % (''.join(action_styles)))
             FlushCommentLine(f, text, styles, c[0] + from_time,
                              c[0] + from_time + action_time, styleid)
-    except (IndexError, ValueError) as e:
+    except (IndexError, ValueError):
         logging.warning('Invalid comment: %r' % c[3])
 
 
@@ -721,7 +707,7 @@ def ProcessComments(comments, f, width, height, bottom_reserved, fontface,
                     filters_regex, reduced, progress_callback):
     styleid = 'white'
     WriteASSHead(f, width, height, fontface, fontsize, alpha, styleid)
-    rows = [[None] * (height - bottom_reserved + 1) for i in range(4)]
+    rows = [[None] * (height - bottom_reserved + 1) for _ in range(4)]
     for idx, i in enumerate(comments):
         if progress_callback and idx % 1000 == 0:
             progress_callback(idx, len(comments))
@@ -986,7 +972,6 @@ def export(func):
 
 @export
 def Danmaku2ASS(input_files,
-                input_format,
                 output_file,
                 stage_width,
                 stage_height,
@@ -1013,7 +998,7 @@ def Danmaku2ASS(input_files,
         except BaseException:
             raise ValueError('Invalid regular expression: %s' % comment_filter)
     fo = None
-    comments = ReadComments(input_files, input_format, font_size)
+    comments = ReadComments(input_files, font_size)
     try:
         if output_file:
             fo = ConvertToFile(output_file,
@@ -1034,7 +1019,6 @@ def Danmaku2ASS(input_files,
 
 @export
 def ReadComments(input_files,
-                 input_format,
                  font_size=25.0,
                  progress_callback=None):
     if isinstance(input_files, bytes):
@@ -1132,8 +1116,7 @@ def main():
     parser.add_argument(
         '-flf',
         '--filter-file',
-        help=
-        'Regular expressions from file (one line one regex) to filter comments'
+        help='Regular expressions from file (one line one regex) to filter comments'
     )
     parser.add_argument('-p',
                         '--protect',
@@ -1156,7 +1139,7 @@ def main():
         height = int(height)
     except ValueError:
         raise ValueError('Invalid stage size: %r' % args.size)
-    Danmaku2ASS(args.file, args.format, args.output, width, height,
+    Danmaku2ASS(args.file, args.output, width, height,
                 args.protect, args.font, args.fontsize, args.alpha,
                 args.duration_marquee, args.duration_still, args.filter,
                 args.filter_file, args.reduce)
